@@ -44,6 +44,28 @@ Work the part out as numbers first. Then build it in a few large `batch` calls, 
 - **Profiles:** extrude takes every region by default. For a ring or a boss with a hole, pass `profiles`.
 - **Order:** fillet the outside edges before you shell, so the shell follows the fillets. An edge of the face the shell removes, such as the rim of an open box, is the exception: round it after the shell, because the shell can fail on it.
 
+## Timeline quality
+The timeline is the part's specification. A user opening the file to tweak it should read feature names and understand the intent immediately. Every extra feature is a maintenance burden and regeneration cost.
+
+**Budget:** aim for ≤ 20 features for a typical enclosure or bracket. If you exceed 30, stop and restructure.
+
+**Rules that cut feature count in half:**
+
+| Situation | Wrong (many steps) | Right (one step) |
+|---|---|---|
+| Four standoff posts | 4 × cylinder + 4 × combine | One sketch with 4 circles → one extrude |
+| Four screw holes | 4 × cylinder + 4 × combine | `solid.hole` with `positions` array, or one sketch with 4 circles → one cut extrude |
+| Six vent holes | 6 × cylinder + 6 × combine | One cylinder + `solid.pattern.rectangular` |
+| Hollowing a box | box + combine (cut) | `solid.shell {faces:[...], thickness:wall}` |
+| Same opening on two sides | 2 × box + 2 × combine | Sketch both openings, extrude once; or `solid.mirror` |
+| Connector slots | sketch per slot, extrude per slot | One sketch with all slots → one cut extrude |
+
+**Naming:** every feature must be named at creation. Pass `body_name` to primitives (`solid.box`, `solid.cylinder`, `solid.extrude`) and use `feature_name` where supported. The timeline entries `Sketch1`, `Extrude1`, `Box3` are always wrong; `StandoffPads`, `USB_slot`, `CaseShell` are always right.
+
+**Parameters cover derived values too.** Every coordinate that follows from a base dimension must be expressed as a formula, not a number. If `wall = 2` and the inner pocket starts at `wall`, write `"wall"` in the position field, not `2`. Define intermediate parameters (`outer_l = pcb_l + 2*wall`) so downstream steps use names, not arithmetic.
+
+**Prefer direct operations over `solid.combine`.** `solid.shell`, `solid.pattern.*`, `solid.mirror`, `solid.hole`, and sketch-based extrude cuts all avoid an extra combine step. Count your `solid.combine` calls: more than 3–4 in a single part is a sign that you are building feature by feature instead of thinking in groups.
+
 ## Verify
 - **Each stage:** run `measure {}` (about 1 KB) and compare the volume, bbox and face count with your numbers. A cut or hole that leaves the volume unchanged has missed, even though it reported success.
 - **Timeline health:** `inspect_design {"measure":false,"sketches":false}` shows each feature's `error` and `warning`.
@@ -68,3 +90,8 @@ Work the part out as numbers first. Then build it in a few large `batch` calls, 
 | "Inspect the sketch" | `sketch.solve` returns dof and the profile count in under 100 bytes. Run `sketch.inspect` on its own, never inside a big batch. |
 | "new_design for a clean start" | When the server is bridged, ask first. |
 | "It reported ok, so it worked" | Only a `measure` that matches the computed values counts. |
+| "I'll create each hole separately" | Draw all holes in one sketch; one extrude cuts all of them. |
+| "I'll use solid.combine to subtract a void" | Use `solid.shell`, sketch-based cut extrudes, or `solid.hole` instead. |
+| "I'll loop and create one feature per item" | One sketch with all profiles + one extrude, or one seed + `solid.pattern.*`. |
+| "The name can be Body1 / Sketch2" | Name every feature at creation; the user reads the timeline, not you. |
+| "I'll hardcode `wall + 2` as the number `4`" | Define a parameter for every derived value; parametric means every number is traceable. |
