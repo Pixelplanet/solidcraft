@@ -135,7 +135,7 @@ impl Drop for ApiBackend {
 struct Worker {
     cfg: ApiConfig,
     mcp_backend: Option<solidcraft_mcp::FnBackend>,
-    skills: Option<String>,
+    skills: Option<std::path::PathBuf>,
     /// The MCP tools as OpenAI function tools.
     tools: Vec<Value>,
     history: Vec<Value>,
@@ -154,10 +154,11 @@ impl Worker {
 
     fn run(&mut self, cmds: Receiver<Cmd>) {
         self.start_mcp();
-        let system = match &self.skills {
-            Some(s) if !s.is_empty() => format!("{}\n\n---\n\n{}", super::acp::SYSTEM_NOTE, s),
-            _ => super::acp::SYSTEM_NOTE.to_string(),
-        };
+        let mut system = super::acp::SYSTEM_NOTE.to_string();
+        if let Some(index) = self.skills.as_deref().and_then(super::skills::prompt_index) {
+            system.push_str("\n\n");
+            system.push_str(&index);
+        }
         self.history.push(json!({"role": "system", "content": system}));
         self.emit(Event::Ready { agent: format!("{} \u{b7} {}", self.cfg.name, self.cfg.model), images: true });
         // The endpoint's models for the picker; an endpoint that does not list them shows none.
@@ -185,7 +186,12 @@ impl Worker {
 
     fn start_mcp(&mut self) {
         if self.mcp_backend.is_some() {
-            self.tools = openai_tools(&json!({"tools": solidcraft_mcp::tool_definitions()}));
+            let mut defs = solidcraft_mcp::tool_definitions();
+            // Skills are readable here: an API agent has no skill system of its own.
+            if self.skills.is_some() {
+                defs.extend(super::skills::tool_definitions());
+            }
+            self.tools = openai_tools(&json!({"tools": defs}));
         }
     }
 
@@ -261,6 +267,8 @@ impl Worker {
                     || !self.tools.iter().any(|t| t.pointer("/function/name").and_then(Value::as_str) == Some(name.as_str()))
                 {
                     (format!("unknown tool `{name}`"), true)
+                } else if let Some(r) = self.skills.as_deref().and_then(|dir| super::skills::call(&name, &args, dir)) {
+                    tool_text(&r)
                 } else {
                     match self.mcp_backend.as_mut() {
                         Some(backend) => tool_text(&solidcraft_mcp::call_tool(backend, &name, &args)),
@@ -459,6 +467,13 @@ fn tool_title(name: &str, args: &Value) -> String {
                 .map(|c| c.iter().filter_map(|s| s.get("command").and_then(Value::as_str)).take(4).collect())
                 .unwrap_or_default();
             format!("batch: {}", ids.join(", "))
+        }
+        "read_skill" => {
+            let name = args.get("name").and_then(Value::as_str).unwrap_or("?");
+            match args.get("path").and_then(Value::as_str) {
+                Some(p) => format!("read_skill: {name}/{p}"),
+                None => format!("read_skill: {name}"),
+            }
         }
         _ => name.to_string(),
     }

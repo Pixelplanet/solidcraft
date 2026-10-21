@@ -35,6 +35,8 @@ pub mod paste;
 #[cfg(not(target_arch = "wasm32"))]
 mod process;
 pub mod settings;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod skills;
 
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -705,23 +707,15 @@ fn solidcraft_tool(title: &str) -> bool {
     title.to_ascii_lowercase().contains("solidcraft")
 }
 
-/// Read SKILL.md from every skill folder in `work_dir/.claude/skills/` and join them. Used by
-/// API agents that have no filesystem skill-loading of their own.
+/// The folder the chat installs skills in, inside the agent's working folder. ACP agents find
+/// them there through their own skill system; API agents read them with `list_skills`/
+/// `read_skill` (see [`skills`]).
 #[cfg(not(target_arch = "wasm32"))]
-fn read_installed_skills(work_dir: &std::path::Path) -> Option<String> {
-    let dir = work_dir.join(".claude").join("skills");
-    let mut entries: Vec<_> = std::fs::read_dir(&dir).ok()?.flatten()
-        .filter(|e| e.path().is_dir())
-        .collect();
-    entries.sort_by_key(|e| e.file_name());
-    let parts: Vec<String> = entries.iter()
-        .filter_map(|e| std::fs::read_to_string(e.path().join("SKILL.md")).ok())
-        .collect();
-    (!parts.is_empty()).then(|| parts.join("\n\n---\n\n"))
+fn skills_dir(work_dir: &std::path::Path) -> std::path::PathBuf {
+    work_dir.join(".claude").join("skills")
 }
 
-#[cfg(target_arch = "wasm32")]
-fn read_installed_skills(_: &std::path::Path) -> Option<String> { None }
+/// `solidcraft-cli` next to this program, else on the search path, else the app binary itself
 /// (which handles `--mcp-bridge PORT` as a headless MCP server mode on non-Windows).
 #[cfg(not(target_arch = "wasm32"))]
 fn find_cli() -> Option<std::path::PathBuf> {
@@ -766,7 +760,7 @@ fn working_dir() -> std::path::PathBuf {
 /// the same directory are left untouched.
 #[cfg(not(target_arch = "wasm32"))]
 fn install_skills(work_dir: &std::path::Path) {
-    let dst = work_dir.join(".claude").join("skills");
+    let dst = skills_dir(work_dir);
     let Some(src) = find_bundled_skills() else { return };
     let _ = std::fs::create_dir_all(&dst);
     let Ok(entries) = std::fs::read_dir(&src) else { return };
@@ -860,11 +854,12 @@ pub fn connect(app: &mut SolveApp, ctx: &egui::Context) {
         None
     };
     let wake = ctx.clone();
+    let work = working_dir();
     let start = backend::StartContext {
-        cwd: working_dir(),
+        skills: Some(skills_dir(&work)),
+        cwd: work,
         bridge,
         tools: chat.tools_tx.clone(),
-        skills: read_installed_skills(&working_dir()),
         wake: Box::new(move || wake.request_repaint()),
     };
     let started: Result<Box<dyn ChatBackend>, String> = match entry.kind {
