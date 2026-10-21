@@ -18,7 +18,7 @@ Work the part out as numbers first. Then build it in a few large `batch` calls, 
    - the placement: centre the part on the origin so patterns and mirrors can work from the planes
    - every feature, with the world point you will use for each edge or face pick
    - the expected volume and bounding box
-   - **how many `batch` calls the build needs** (see Changes per message below)
+   - **how many `batch` calls the build needs**, so you can stop cleanly at a message boundary if the limit is reached mid-build
 
 ## Changes per message
 SolidCraft limits how many design changes you can make in one message. The default is **24 changes**; the user can raise it in **Settings → AI → Changes per message**.
@@ -30,11 +30,9 @@ SolidCraft limits how many design changes you can make in one message. The defau
 **What is free (does not count):**
 - `measure`, `inspect_design`, `list_commands`, `screenshot`, `describe_command`
 
-**Planning rule:** every `batch` call in your build plan = one change. Target ≤ 20 batch calls for a part that fits in the default limit of 24, leaving 4 free for verification and corrections. If your plan needs more than 20 batches, tell the user before starting so they can raise the limit.
+**The limit is a message boundary, not a plan boundary.** When it is reached, SolidCraft pauses the build and tells you with `"the limit of N changes for one message is reached"`. Stop cleanly: tell the user what was built and what remains, and they will ask you to continue. The plan does not need to fit in a single message.
 
-**If you hit the limit mid-build:** SolidCraft will refuse the call with `"the limit of N changes for one message is reached"`. Stop, tell the user what is done and what remains, and ask them to send the next message to continue.
-
-**The payoff is large.** A naive build that creates each hole with its own `execute` uses one change per hole. The same build using one sketch with all holes and one batch extrude uses one change for all of them. Good batching makes a 20-feature part fit in 5-6 changes rather than 20+.
+**The payoff of good batching is large.** A naive build that creates each hole with its own `execute` uses one change per hole; the same build using one sketch and one batch extrude uses one change for all holes together. Efficient batching lets you do more work per message and reduces the number of messages needed to complete the part.
 
 ## Build
 - **Stages:** use one batch per stage:
@@ -113,4 +111,4 @@ The timeline is the part's specification. A user opening the file to tweak it sh
 | "The name can be Body1 / Sketch2" | Name every feature at creation; the user reads the timeline, not you. |
 | "I'll hardcode `wall + 2` as the number `4`" | Define a parameter for every derived value; parametric means every number is traceable. |
 | "I'll verify with a quick execute in between" | Count your changes first; save verifications for after each stage batch, not between individual steps. |
-| "I'll start building and see how far I get" | Count the batches your plan needs before the first call; if it exceeds ~20, ask the user to raise the limit. |
+| "I'll start building and see how far I get" | Count the batches your plan needs before the first call; if a message fills up, stop cleanly and continue in the next. |
