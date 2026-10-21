@@ -87,6 +87,8 @@ The open design is reachable through the `solidcraft-app` MCP server: use its to
 measure, screenshot, set_parameter, undo) to read and change the design the user is looking at, and verify with measure or \
 inspect_design. Prefer one `batch` over many small calls. Saving, opening or exporting files waits for the user's approval in \
 the chat, and each message allows a limited number of changes. Don't use shell or file tools: work through the SolidCraft tools. \
+A skill's helper scripts (such as `scripts/run.py`) need a shell and a `solidcraft-cli` on PATH, which this chat does not give \
+you: do what the script does with the SolidCraft tools instead, and say so if a step truly needs one. \
 Keep answers short.";
 
 
