@@ -152,9 +152,7 @@ impl Worker {
 
     fn run(&mut self, cmds: Receiver<Cmd>) {
         self.start_mcp();
-        // Include the modeling skill so API agents follow the same guidelines as ACP agents.
-        let system = format!("{}\n\n---\n\n{}", super::acp::SYSTEM_NOTE, super::acp::MODELING_SKILL);
-        self.history.push(json!({"role": "system", "content": system}));
+        self.history.push(json!({"role": "system", "content": super::acp::SYSTEM_NOTE}));
         self.emit(Event::Ready { agent: format!("{} \u{b7} {}", self.cfg.name, self.cfg.model), images: true });
         // The endpoint's models for the picker; an endpoint that does not list them shows none.
         if let Ok(list) = model_list(&self.cfg.http, &self.cfg.base_url, self.cfg.key.as_deref()) {

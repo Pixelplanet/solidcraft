@@ -732,14 +732,68 @@ fn find_cli() -> Option<std::path::PathBuf> {
 }
 
 /// The agent's working folder: an empty folder of SolidCraft's own, so an agent's own file tools
-/// (where it has them) see nothing of the user's.
+/// (where it has them) see nothing of the user's. Skills are installed into `.claude/skills/`
+/// inside it so the agent discovers them via the standard cwd mechanism.
 fn working_dir() -> std::path::PathBuf {
     let d = solidcraft_engine::recovery::data_dir()
         .map(|d| d.join("agent-chat").join("work"))
         .unwrap_or_else(|| std::env::temp_dir().join("solidcraft-agent-chat"));
     #[cfg(not(target_arch = "wasm32"))]
     let _ = std::fs::create_dir_all(&d);
+    #[cfg(not(target_arch = "wasm32"))]
+    install_skills(&d);
     d
+}
+
+/// Install the bundled `solidcraft-*` skills into `work_dir/.claude/skills/`, refreshing them on
+/// every call so app updates propagate automatically. Custom skills with other name prefixes in
+/// the same directory are left untouched.
+#[cfg(not(target_arch = "wasm32"))]
+fn install_skills(work_dir: &std::path::Path) {
+    let dst = work_dir.join(".claude").join("skills");
+    let Some(src) = find_bundled_skills() else { return };
+    let _ = std::fs::create_dir_all(&dst);
+    let Ok(entries) = std::fs::read_dir(&src) else { return };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        if entry.path().is_dir() && name.to_string_lossy().starts_with("solidcraft-") {
+            let skill_dst = dst.join(&name);
+            let _ = std::fs::remove_dir_all(&skill_dst);
+            copy_dir(&entry.path(), &skill_dst);
+        }
+    }
+}
+
+/// The bundled `skills/` directory: next to the executable (production) or up to 5 levels above
+/// it (development, where the executable is in `target/release/` and skills are at the root).
+#[cfg(not(target_arch = "wasm32"))]
+fn find_bundled_skills() -> Option<std::path::PathBuf> {
+    let mut dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    for _ in 0..5 {
+        let skills = dir.join("skills");
+        if skills.is_dir() && skills.join("solidcraft-modeling").is_dir() {
+            return Some(skills);
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+    None
+}
+
+/// Recursively copy `src` into `dst`, creating `dst` if needed. Errors are silently ignored.
+#[cfg(not(target_arch = "wasm32"))]
+fn copy_dir(src: &std::path::Path, dst: &std::path::Path) {
+    let _ = std::fs::create_dir_all(dst);
+    let Ok(entries) = std::fs::read_dir(src) else { return };
+    for entry in entries.flatten() {
+        let dst_path = dst.join(entry.file_name());
+        if entry.path().is_dir() {
+            copy_dir(&entry.path(), &dst_path);
+        } else {
+            let _ = std::fs::copy(entry.path(), dst_path);
+        }
+    }
 }
 
 /// Start the agent: the chat's control endpoint for its MCP bridge if needed, the process.

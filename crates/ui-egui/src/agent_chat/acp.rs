@@ -89,8 +89,6 @@ inspect_design. Prefer one `batch` over many small calls. Saving, opening or exp
 the chat, and each message allows a limited number of changes. Don't use shell or file tools: work through the SolidCraft tools. \
 Keep answers short.";
 
-/// The solidcraft-modeling skill, embedded at compile time so the built-in chat never needs it installed separately.
-pub const MODELING_SKILL: &str = include_str!("../../../../skills/solidcraft-modeling/SKILL.md");
 
 /// The Claude Code adapter's own tools that reach the computer rather than the design: turned off
 /// for the session (`_meta.claudeCode.options.disallowedTools`), so it works through SolidCraft's.
@@ -99,13 +97,11 @@ pub const CLAUDE_DISALLOWED_TOOLS: &[&str] =
 
 pub fn session_new_params(cwd: &std::path::Path, bridge: Option<&McpBridge>) -> Value {
     let servers: Vec<Value> = bridge.map(McpBridge::to_json).into_iter().collect();
-    // Append the modeling skill so the agent follows it without a separate skills installation.
-    let prompt = format!("{SYSTEM_NOTE}\n\n---\n\n{MODELING_SKILL}");
     json!({
         "cwd": cwd.to_string_lossy(),
         "mcpServers": servers,
         "_meta": {
-            "systemPrompt": {"append": prompt},
+            "systemPrompt": {"append": SYSTEM_NOTE},
             // Hosts may opt a session out of "bypass permissions" (the Claude adapter reads it):
             // every tool call the agent asks about reaches the panel.
             // Its own shell and file tools are off: the agent works through SolidCraft's tools.
