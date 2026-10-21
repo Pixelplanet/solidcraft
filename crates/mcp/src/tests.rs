@@ -692,11 +692,25 @@ fn tool_calls_stay_inside_the_agents_folders() {
             ("screenshot", json!({"path": p, "width": 64, "height": 64})),
             ("execute", json!({"command": "file.save_as", "params": {"path": p}})),
             ("batch", json!({"commands": [{"command": "file.export", "params": {"path": p}}]})),
+            ("run_script", json!({"commands": [], "design": p})),
+            (
+                "run_script",
+                json!({"commands": [
+                    {"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10}},
+                    {"command": "file.export", "params": {"path": p}},
+                ]}),
+            ),
+            ("compare_shapes", json!({"actual": p, "expected": p})),
         ] {
             let r = raw_tool(&mut s, name, args);
             assert_eq!(r["result"]["isError"], json!(true), "{name} {p}: {r}");
             assert!(r.to_string().contains("outside the folders this agent may use"), "{name} {p}: {r}");
         }
+        // A `run_script` save outside the folders is refused at its last step, and the report
+        // says so rather than claiming a file it did not write.
+        let r = raw_tool(&mut s, "run_script", json!({"commands": [], "save": p}));
+        assert!(r.to_string().contains("outside the folders this agent may use"), "{p}: {r}");
+        assert!(!r.to_string().contains("\"saved\""), "{p}: {r}");
     }
     assert_eq!(std::fs::read_dir(&out).unwrap().count(), 0, "nothing written outside");
     let _ = std::fs::remove_dir_all(&base);
