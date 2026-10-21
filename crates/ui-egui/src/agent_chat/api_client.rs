@@ -79,6 +79,7 @@ impl ApiBackend {
             let mut w = Worker {
                 cfg,
                 mcp_backend,
+                skills: ctx.skills,
                 tools: Vec::new(),
                 history: Vec::new(),
                 events: ev_tx,
@@ -134,6 +135,7 @@ impl Drop for ApiBackend {
 struct Worker {
     cfg: ApiConfig,
     mcp_backend: Option<solidcraft_mcp::FnBackend>,
+    skills: Option<String>,
     /// The MCP tools as OpenAI function tools.
     tools: Vec<Value>,
     history: Vec<Value>,
@@ -152,7 +154,11 @@ impl Worker {
 
     fn run(&mut self, cmds: Receiver<Cmd>) {
         self.start_mcp();
-        self.history.push(json!({"role": "system", "content": super::acp::SYSTEM_NOTE}));
+        let system = match &self.skills {
+            Some(s) if !s.is_empty() => format!("{}\n\n---\n\n{}", super::acp::SYSTEM_NOTE, s),
+            _ => super::acp::SYSTEM_NOTE.to_string(),
+        };
+        self.history.push(json!({"role": "system", "content": system}));
         self.emit(Event::Ready { agent: format!("{} \u{b7} {}", self.cfg.name, self.cfg.model), images: true });
         // The endpoint's models for the picker; an endpoint that does not list them shows none.
         if let Ok(list) = model_list(&self.cfg.http, &self.cfg.base_url, self.cfg.key.as_deref()) {
@@ -542,7 +548,7 @@ mod tests {
             Ok((200, a.to_string().into_bytes()))
         });
         let cfg = ApiConfig { name: "Test".into(), base_url: "http://localhost:1/v1".into(), model: "m".into(), key: None, http };
-        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
+        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, skills: None, wake: Box::new(|| {}) };
         let mut b = ApiBackend::start(cfg, ctx).unwrap();
         b.prompt(&[PromptPart::Text("measure it".into())]);
         let mut events = Vec::new();
@@ -588,7 +594,7 @@ mod tests {
             Ok((200, json!({"choices": [{"message": {"role": "assistant", "content": "Steered."}}]}).to_string().into_bytes()))
         });
         let cfg = ApiConfig { name: "Test".into(), base_url: "http://localhost:1/v1".into(), model: "m".into(), key: None, http };
-        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
+        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, skills: None, wake: Box::new(|| {}) };
         let mut b = ApiBackend::start(cfg, ctx).unwrap();
         let wait = |b: &mut ApiBackend, events: &mut Vec<Event>| {
             let start = std::time::Instant::now();
@@ -635,7 +641,7 @@ mod tests {
             Ok((200, json!({"choices": [{"message": {"role": "assistant", "content": "ok"}}]}).to_string().into_bytes()))
         });
         let cfg = ApiConfig { name: "Test".into(), base_url: "http://localhost:1/v1".into(), model: "m".into(), key: None, http };
-        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
+        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, skills: None, wake: Box::new(|| {}) };
         let mut b = ApiBackend::start(cfg, ctx).unwrap();
         let run = |b: &mut ApiBackend, f: &dyn Fn(&mut ApiBackend), want: usize| {
             f(b);
@@ -673,7 +679,7 @@ mod tests {
             Ok((200, json!({"choices": [{"message": {"role": "assistant", "content": "ok"}}]}).to_string().into_bytes()))
         });
         let cfg = ApiConfig { name: "Test".into(), base_url: "http://localhost:1/v1".into(), model: "local".into(), key: None, http };
-        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
+        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, skills: None, wake: Box::new(|| {}) };
         let mut b = ApiBackend::start(cfg, ctx).unwrap();
         let mut events = Vec::new();
         let start = std::time::Instant::now();
@@ -722,7 +728,7 @@ mod tests {
             Ok((200, answers.lock().unwrap().pop().unwrap_or(json!({})).to_string().into_bytes()))
         });
         let cfg = ApiConfig { name: "Test".into(), base_url: "http://localhost:1/v1".into(), model: "m".into(), key: None, http };
-        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
+        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, skills: None, wake: Box::new(|| {}) };
         let mut b = ApiBackend::start(cfg, ctx).unwrap();
         b.prompt(&[PromptPart::Text("go".into())]);
         let mut events = Vec::new();
@@ -748,7 +754,7 @@ mod tests {
         let http: HttpFn = Arc::new(|_: &HttpRequest| Ok((200, b"{}".to_vec())));
         assert!(test_endpoint(&http, "http://10.0.0.2:11434/v1", Some("k"), "m").is_err());
         let cfg = ApiConfig { name: "x".into(), base_url: "http://10.0.0.2/v1".into(), model: "m".into(), key: Some("k".into()), http };
-        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
+        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, skills: None, wake: Box::new(|| {}) };
         assert!(ApiBackend::start(cfg, ctx).is_err());
     }
 
