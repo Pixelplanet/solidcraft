@@ -1456,6 +1456,7 @@
   "ui.agent_chat_dock_right": "右にドッキング",
   "ui.agent_chat_drop_hint": "ドロップして次のメッセージに添付",
   "ui.agent_chat_edit": "編集",
+  "ui.agent_chat_empty_reply": "モデルはツール呼び出しすら返さず、まったく応答しませんでした。もう一度メッセージを送ってください。それでも続く場合は、プロンプトまたは読み込んだスキルがこのモデルにとって多すぎます。",
   "ui.agent_chat_exited": "エージェントが停止しました。",
   "ui.agent_chat_failed_start": "エージェントを起動できませんでした: {error}",
   "ui.agent_chat_file_cad_not_read": "{name}: CAD ファイルは読み込まず、デザインにインポートします",
