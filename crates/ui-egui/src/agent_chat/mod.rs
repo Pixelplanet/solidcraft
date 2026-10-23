@@ -726,22 +726,23 @@ fn find_cli() -> Option<std::path::PathBuf> {
     if let Some(p) = solidcraft_engine::geom::env::var("CLI").map(std::path::PathBuf::from).filter(|p| p.is_file()) {
         return Some(p);
     }
-    std::env::current_exe()
+    let found = std::env::current_exe()
         .ok()
         .and_then(|e| e.parent().map(|d| d.join(name)))
         .filter(|p| p.is_file())
-        .or_else(|| discover::find_in("solidcraft-cli", &discover::search_dirs()))
-        // On non-Windows the app binary itself can serve as the MCP bridge (--mcp-bridge mode).
-        .or_else(|| {
-            #[cfg(not(windows))]
-            {
-                std::env::current_exe().ok().filter(|p| p.is_file())
-            }
-            #[cfg(windows)]
-            {
-                None
-            }
-        })
+        .or_else(|| discover::find_in("solidcraft-cli", &discover::search_dirs()));
+    if let Some(p) = found {
+        return Some(p);
+    }
+    // On non-Windows the app binary itself can serve as the MCP bridge (--mcp-bridge mode).
+    #[cfg(not(windows))]
+    {
+        std::env::current_exe().ok().filter(|p| p.is_file())
+    }
+    #[cfg(windows)]
+    {
+        None
+    }
 }
 
 /// The agent's working folder: an empty folder of SolidCraft's own, so an agent's own file tools
@@ -851,11 +852,7 @@ pub fn connect(app: &mut SolveApp, ctx: &egui::Context) {
     }
     // ACP agents get the MCP bridge so the agent can start its own server process.
     // API agents skip this: their tool loop runs in-process via StartContext::tools.
-    let bridge = if entry.kind == agents::Kind::Acp {
-        cli.zip(chat.tools_port).map(|(cli, port)| acp::McpBridge { cli, port })
-    } else {
-        None
-    };
+    let bridge = if entry.kind == agents::Kind::Acp { cli.zip(chat.tools_port).map(|(cli, port)| acp::McpBridge { cli, port }) } else { None };
     let wake = ctx.clone();
     let work = working_dir();
     let start = backend::StartContext {

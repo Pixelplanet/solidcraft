@@ -73,8 +73,7 @@ impl ApiBackend {
                     return json!({"ok": false, "error": "the design channel closed"});
                 }
                 w(); // trigger repaint so the main thread processes the request
-                rx.recv_timeout(TOOL_TIMEOUT)
-                    .unwrap_or_else(|_| json!({"ok": false, "error": "timed out waiting for the design"}))
+                rx.recv_timeout(TOOL_TIMEOUT).unwrap_or_else(|_| json!({"ok": false, "error": "timed out waiting for the design"}))
             })
         });
         let (cmd_tx, cmd_rx) = channel::<Cmd>();
@@ -678,10 +677,7 @@ mod tests {
             events.extend(b.poll());
             std::thread::sleep(Duration::from_millis(10));
         }
-        assert!(
-            events.iter().any(|e| matches!(e, Event::Error(text) if !text.is_empty())),
-            "the empty answer must be reported: {events:?}"
-        );
+        assert!(events.iter().any(|e| matches!(e, Event::Error(text) if !text.is_empty())), "the empty answer must be reported: {events:?}");
         assert!(matches!(events.last(), Some(Event::TurnEnded { reason }) if reason == "error"), "{events:?}");
         b.shutdown(true);
     }
@@ -689,7 +685,8 @@ mod tests {
     /// New chat resets the model's history to the system note: the next request carries nothing
     /// of the conversation before it.
     #[test]
-    fn a_new_chat_resets_the_history_to_the_system_note() {        let seen = Arc::new(std::sync::Mutex::new(Vec::<Value>::new()));
+    fn a_new_chat_resets_the_history_to_the_system_note() {
+        let seen = Arc::new(std::sync::Mutex::new(Vec::<Value>::new()));
         let log = seen.clone();
         let http: HttpFn = Arc::new(move |r: &HttpRequest| {
             if r.method == "GET" {

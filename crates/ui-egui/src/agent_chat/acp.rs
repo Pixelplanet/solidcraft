@@ -91,7 +91,6 @@ A skill's helper scripts (such as `scripts/run.py`) need a shell and a `solidcra
 you: do what the script does with the SolidCraft tools instead, and say so if a step truly needs one. \
 Keep answers short.";
 
-
 /// The Claude Code adapter's own tools that reach the computer rather than the design: turned off
 /// for the session (`_meta.claudeCode.options.disallowedTools`), so it works through SolidCraft's.
 pub const CLAUDE_DISALLOWED_TOOLS: &[&str] =

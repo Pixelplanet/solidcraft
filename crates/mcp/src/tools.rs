@@ -756,10 +756,10 @@ fn run_script(a: &Map<String, Value>) -> Value {
     let verbose = a.get("verbose").and_then(Value::as_bool).unwrap_or(false);
     let measure = a.get("measure").and_then(Value::as_bool).unwrap_or(true);
     let mut s = Session::default();
-    if let Some(design) = str_arg(a, "design") {
-        if let Err(e) = s.execute("doc.open", &json!({"path": design})) {
-            return text_result(&json!(format!("{design}: {e}")), true);
-        }
+    if let Some(design) = str_arg(a, "design")
+        && let Err(e) = s.execute("doc.open", &json!({"path": design}))
+    {
+        return text_result(&json!(format!("{design}: {e}")), true);
     }
     let mut results = Vec::with_capacity(steps.len());
     let mut step_reports = Vec::new();
@@ -828,10 +828,8 @@ fn compare_shapes(a: &Map<String, Value>) -> Value {
             _ => Err(format!("`{side}` holds {} bodies ({}): name one with `{side}_body`", names.len(), names.join(", "))),
         }
     };
-    let (pa, pb) = match (
-        pick(str_arg(a, "actual_body"), &actual_bodies, "actual"),
-        pick(str_arg(a, "expected_body"), &expected_bodies, "expected"),
-    ) {
+    let (pa, pb) = match (pick(str_arg(a, "actual_body"), &actual_bodies, "actual"), pick(str_arg(a, "expected_body"), &expected_bodies, "expected"))
+    {
         (Ok(a), Ok(b)) => (a, b),
         (Err(e), _) | (_, Err(e)) => return text_result(&Value::String(e), true),
     };
